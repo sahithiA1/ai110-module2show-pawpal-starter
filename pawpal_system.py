@@ -7,6 +7,7 @@ See diagrams/uml.mmd for the matching class diagram.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date
 from typing import Optional
 
 
@@ -19,6 +20,9 @@ class Task:
     priority: str = "medium"  # "low", "medium", or "high"
     category: str = "general"  # e.g. "walk", "feeding", "grooming", "meds"
     preferred_time: str = "any"  # e.g. "morning", "afternoon", "evening", "any"
+    time: str = ""  # specific scheduled time as "HH:MM"; empty means unscheduled
+    due_date: date = field(default_factory=date.today)
+    pet_name: str = ""  # set by Pet.add_task()
     completed: bool = False
     recurrence: str = "none"  # e.g. "none", "daily", "weekly"
 
@@ -28,6 +32,10 @@ class Task:
 
     def priority_value(self) -> int:
         """Return a numeric rank for this task's priority (higher = more important)."""
+        raise NotImplementedError
+
+    def next_occurrence(self) -> Optional[Task]:
+        """Return a new, incomplete copy of this task for its next due date, or None if it does not recur."""
         raise NotImplementedError
 
 
@@ -41,7 +49,7 @@ class Pet:
     tasks: list[Task] = field(default_factory=list)
 
     def add_task(self, task: Task) -> None:
-        """Add a care task for this pet."""
+        """Add a care task for this pet and set the task's pet_name."""
         raise NotImplementedError
 
     def remove_task(self, title: str) -> None:
@@ -54,7 +62,7 @@ class Pet:
 
 
 class Owner:
-    """A pet owner with a daily time budget, care preferences, and one or more pets."""
+    """A pet owner with a daily time budget, preferred task categories, and one or more pets."""
 
     def __init__(
         self,
@@ -66,6 +74,7 @@ class Owner:
         """Create an owner; preferences and pets default to empty lists."""
         self.name: str = name
         self.available_minutes: int = available_minutes
+        # Preferred task categories (e.g. "walk", "meds") to favor when scheduling
         self.preferences: list[str] = preferences if preferences is not None else []
         self.pets: list[Pet] = pets if pets is not None else []
 
@@ -100,7 +109,7 @@ class Scheduler:
         raise NotImplementedError
 
     def build_daily_plan(self) -> list[Task]:
-        """Fill the day with tasks that fit the owner's available time and preferences."""
+        """Reset the plan, then fill the day with tasks that fit the owner's available time and preferred categories."""
         raise NotImplementedError
 
     def total_scheduled_minutes(self) -> int:
@@ -111,10 +120,10 @@ class Scheduler:
         """Return a human-readable explanation of what was scheduled or skipped and why."""
         raise NotImplementedError
 
-    def detect_conflicts(self) -> list[Task]:
-        """Return tasks that conflict with each other (e.g. overlapping time slots)."""
+    def detect_conflicts(self) -> list[str]:
+        """Return a warning message for each pair of tasks scheduled at the same date and time."""
         raise NotImplementedError
 
-    def handle_recurring_tasks(self) -> list[Task]:
-        """Return the next occurrences of completed recurring tasks."""
+    def complete_task(self, pet: Pet, task: Task) -> Optional[Task]:
+        """Mark a pet's task complete and add its next occurrence to the pet, if it recurs."""
         raise NotImplementedError

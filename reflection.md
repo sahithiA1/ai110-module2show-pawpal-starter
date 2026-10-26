@@ -5,12 +5,17 @@
 **a. Initial design**
 
 - Briefly describe your initial UML design.
+My initial UML design for PawPal+ includes four main classes: Owner, Pet, Task, and Scheduler. The diagram shows how these classes connect to manage pet care activities. One owner can have multiple pets, each pet can have multiple tasks, and the scheduler organizes those tasks into a daily plan. I wanted to keep the design simple and organized so it would be easier to implement and maintain.
+
 - What classes did you include, and what responsibilities did you assign to each?
+I included four main classes in my PawPal+ design: Owner, Pet, Task, and Scheduler. The Owner class stores the owner's information, available time, preferences, and pets. The Pet class stores details such as the pet's name, species, age, and care tasks. The Task class manages activities like feeding, walking, grooming, and medications, including their duration, priority, and completion status. The Scheduler class is responsible for organizing tasks, checking for scheduling conflicts, and creating a daily plan based on available time and priorities. I separated these responsibilities to keep the system organized and easier to maintain.
 
 **b. Design changes**
 
 - Did your design change during implementation?
+Yes, I made a few changes to my initial design after reviewing the UML diagram and Python class skeletons with AI. I kept the same four main classes but added more details to support scheduling conflicts and recurring tasks.
 - If yes, describe at least one change and why you made it.
+One important change was adding a specific time and due date to the Task class. Initially, tasks only had general preferred times like morning or evening, which made it difficult to identify scheduling conflicts. Adding an exact time allows the scheduler to detect tasks scheduled at the same time, while the due date helps manage recurring tasks. I also added a pet name to each task so the scheduler can identify which pet the activity belongs to. These changes make the design more practical and easier to implement.
 
 ---
 

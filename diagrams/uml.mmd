@@ -27,10 +27,14 @@ classDiagram
         +str priority
         +str category
         +str preferred_time
+        +str time
+        +date due_date
+        +str pet_name
         +bool completed
+        +str recurrence
         +mark_complete() None
         +priority_value() int
-        +str recurrence
+        +next_occurrence() Task
     }
 
     class Scheduler {
@@ -42,11 +46,12 @@ classDiagram
         +build_daily_plan() list~Task~
         +total_scheduled_minutes() int
         +explain_plan() str
-        +detect_conflicts() list~Task~
-        +handle_recurring_tasks() list~Task~
+        +detect_conflicts() list~str~
+        +complete_task(pet: Pet, task: Task) Task
     }
 
     Owner "1" o-- "0..*" Pet : owns
     Pet "1" *-- "0..*" Task : needs
     Scheduler "1" --> "1" Owner : plans for
-    Scheduler ..> Task : schedules
+    Scheduler --> "0..*" Task : schedules
+    Task ..> Task : next_occurrence creates
