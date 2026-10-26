@@ -35,12 +35,14 @@ classDiagram
         +mark_complete() None
         +priority_value() int
         +next_occurrence() Task
+        +identity() tuple
     }
 
     class Scheduler {
         +Owner owner
         +list~Task~ scheduled_tasks
         +list~Task~ skipped_tasks
+        +date plan_date
         +collect_tasks() list~Task~
         +sort_tasks(tasks: list~Task~) list~Task~
         +build_daily_plan() list~Task~

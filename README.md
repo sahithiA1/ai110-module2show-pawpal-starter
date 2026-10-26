@@ -42,32 +42,54 @@ pip install -r requirements.txt
 6. Connect your logic to the Streamlit UI in `app.py`.
 7. Refine UML so it matches what you actually built.
 
+## Implementation Summary
+
+The core logic lives in `pawpal_system.py` and is built from four classes:
+
+- **Task** is a single care activity, such as a walk, feeding, medication, or grooming. It stores the duration, priority, category, preferred time, due date, and whether the task repeats. It can mark itself complete and create its next occurrence (daily or weekly).
+- **Pet** holds its own list of tasks. It can add tasks (ignoring duplicates), remove them, and return the ones still pending.
+- **Owner** has a name, a daily time budget (`available_minutes`), preferred task categories, and one or more pets.
+- **Scheduler** builds the daily plan for one owner. It sorts pending tasks by priority, preferred category, and time of day, then adds them until the owner's available minutes run out. It records why each task was scheduled or skipped, warns when two tasks share the same time, and adds the next occurrence when a recurring task is completed.
+
+The Scheduler does not read tasks from a single pet. It gets them from `Owner.get_all_tasks()`, which combines the tasks of every pet the owner has, so one plan covers all of the owner's pets.
+
 ## 🖥️ Sample Output
 
-Paste a sample of your app's CLI or Streamlit output here so a reader can see what a generated plan looks like:
+Run the demo with `python main.py` to generate today's schedule for Jordan's pets, Mochi and Luna:
 
-```
-# e.g.:
-# Daily plan for Biscuit (Golden Retriever):
-#   08:00 — Morning walk (30 min) [priority: high]
-#   09:00 — Feeding (10 min) [priority: high]
-#   ...
+```text
+============================================================
+  Today's Schedule for Jordan  (2026-10-26)
+============================================================
+Time   Pet     Task                  Duration  Priority
+------------------------------------------------------------
+07:30  Mochi   Breakfast             10 min    high
+08:00  Mochi   Morning walk          30 min    high
+09:00  Luna    Thyroid medication    5 min     high
+18:00  Luna    Dinner                10 min    medium
+------------------------------------------------------------
+Time used: 55 of 90 minutes
+
+Skipped tasks:
+  - Bath and brush for Mochi (low priority): needs 45 min, but only 35 min were left
 ```
 
 ## 🧪 Testing PawPal+
 
 ```bash
 # Run the full test suite:
-pytest
+python -m pytest
 
 # Run with coverage:
-pytest --cov
+python -m pytest --cov=pawpal_system
 ```
+
+Coverage requires the `pytest-cov` package (`pip install pytest-cov`).
 
 Sample test output:
 
-```
-# Paste your pytest output here
+```text
+2 passed in 0.12s
 ```
 
 ## 📐 Smarter Scheduling
