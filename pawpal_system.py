@@ -6,12 +6,19 @@ See diagrams/uml.mmd for the matching class diagram.
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Optional
 
 PRIORITY_RANKS = {"low": 1, "medium": 2, "high": 3}
 TIME_OF_DAY_ORDER = {"morning": 0, "afternoon": 1, "evening": 2, "any": 3}
 RECURRENCE_INTERVALS = {"daily": timedelta(days=1), "weekly": timedelta(weeks=1)}
+MINUTES_PER_DAY = 24 * 60
+
+
+def time_to_minutes(hhmm: str) -> int:
+    """Convert an 'HH:MM' time string to minutes after midnight (e.g. '08:30' -> 510)."""
+    hours, minutes = hhmm.split(":")
+    return int(hours) * 60 + int(minutes)
 
 
 @dataclass
@@ -29,6 +36,18 @@ class Task:
     completed: bool = False
     recurrence: str = "none"  # e.g. "none", "daily", "weekly"
 
+    def __post_init__(self) -> None:
+        """Reject a time that is not empty or a valid 24-hour 'HH:MM' string."""
+        if not self.time:
+            return
+        try:
+            datetime.strptime(self.time, "%H:%M")
+        except ValueError:
+            raise ValueError(
+                f"Invalid time '{self.time}' for task '{self.title}': "
+                "time must be in 24-hour HH:MM format (e.g. '08:00' or '18:30')."
+            ) from None
+
     def mark_complete(self) -> None:
         """Mark this task as completed."""
         self.completed = True
@@ -38,11 +57,15 @@ class Task:
         return PRIORITY_RANKS.get(self.priority.lower(), PRIORITY_RANKS["medium"])
 
     def next_occurrence(self) -> Optional[Task]:
-        """Return a new, incomplete copy of this task for its next due date, or None if it does not recur."""
+        """Return a new, incomplete copy of this task for its next due date, or None if it does not recur.
+
+        An overdue task counts forward from today, so its next occurrence is never in the past.
+        """
         interval = RECURRENCE_INTERVALS.get(self.recurrence.lower())
         if interval is None:
             return None
-        return replace(self, due_date=self.due_date + interval, completed=False)
+        start = max(self.due_date, date.today())
+        return replace(self, due_date=start + interval, completed=False)
 
     def identity(self) -> tuple[str, str, date, str]:
         """Return a key identifying this task occurrence, used to detect duplicates."""
@@ -154,6 +177,27 @@ class Scheduler:
             ),
         )
 
+    def sort_by_time(self, tasks: list[Task]) -> list[Task]:
+        """Return tasks in chronological order by their 'HH:MM' time; tasks without a time go last."""
+        return sorted(
+            tasks,
+            key=lambda t: time_to_minutes(t.time) if t.time else MINUTES_PER_DAY,
+        )
+
+    def filter_tasks(
+        self, pet_name: Optional[str] = None, completed: Optional[bool] = None
+    ) -> list[Task]:
+        """Return the owner's tasks, optionally limited to one pet (case-insensitive) and/or a completion status.
+
+        Leaving a filter as None skips it, so calling with no arguments returns every task.
+        """
+        tasks = self.owner.get_all_tasks()
+        if pet_name is not None:
+            tasks = [t for t in tasks if t.pet_name.lower() == pet_name.lower()]
+        if completed is not None:
+            tasks = [t for t in tasks if t.completed == completed]
+        return tasks
+
     def build_daily_plan(self) -> list[Task]:
         """Reset the plan, then fill the day with tasks that fit the owner's available time and preferred categories."""
         self.scheduled_tasks = []
@@ -172,13 +216,8 @@ class Scheduler:
                     f"needs {task.duration_minutes} min but only {remaining} min left"
                 )
 
-        # Present the final plan in time-of-day order
-        self.scheduled_tasks.sort(
-            key=lambda t: (
-                TIME_OF_DAY_ORDER.get(t.preferred_time.lower(), TIME_OF_DAY_ORDER["any"]),
-                t.time or "99:99",
-            )
-        )
+        # Present the final plan in chronological order
+        self.scheduled_tasks = self.sort_by_time(self.scheduled_tasks)
         return self.scheduled_tasks
 
     def _schedule_reason(self, task: Task) -> str:
@@ -226,17 +265,34 @@ class Scheduler:
         return "\n".join(lines)
 
     def detect_conflicts(self) -> list[str]:
-        """Return a warning message for each pair of tasks scheduled at the same date and time."""
+        """Return a warning message for each pair of timed tasks on the same date whose time ranges overlap.
+
+        Each task occupies [start, start + duration) in minutes; tasks without a time are ignored.
+        """
         tasks = self.scheduled_tasks or self.collect_tasks()
-        timed = [t for t in tasks if t.time]
+        timed = self.sort_by_time([t for t in tasks if t.time])  # so `first` never starts after `second`
         warnings: list[str] = []
         for i, first in enumerate(timed):
             for second in timed[i + 1 :]:
-                if first.due_date == second.due_date and first.time == second.time:
-                    warnings.append(
-                        f"'{first.title}' ({first.pet_name}) and '{second.title}' "
-                        f"({second.pet_name}) are both at {first.time} on {first.due_date.isoformat()}"
-                    )
+                if first.due_date != second.due_date:
+                    continue
+                first_start = time_to_minutes(first.time)
+                second_start = time_to_minutes(second.time)
+                first_end = first_start + first.duration_minutes
+                second_end = second_start + second.duration_minutes
+                if first_start < second_end and second_start < first_end:
+                    on_date = f"on {first.due_date.isoformat()}"
+                    if first_start == second_start:
+                        warnings.append(
+                            f"'{first.title}' ({first.pet_name}) and '{second.title}' "
+                            f"({second.pet_name}) are both at {first.time} {on_date}"
+                        )
+                    else:
+                        warnings.append(
+                            f"'{first.title}' ({first.pet_name}, {first.time}, "
+                            f"{first.duration_minutes} min) overlaps '{second.title}' "
+                            f"({second.pet_name}, {second.time}) {on_date}"
+                        )
         return warnings
 
     def complete_task(self, pet: Pet, task: Task) -> Optional[Task]:

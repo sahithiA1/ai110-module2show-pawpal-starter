@@ -1,5 +1,7 @@
 classDiagram
-    %% PawPal+ initial design. Keep this file updated so it matches your final implementation.
+    %% PawPal+ final design (Phase 4). Matches the classes in pawpal_system.py.
+    %% Task validates its time ("HH:MM" or empty) in __post_init__ when it is created.
+    %% Module helper (not a class): time_to_minutes(hhmm: str) int, used by sort_by_time() and detect_conflicts().
 
     class Owner {
         +str name
@@ -34,7 +36,7 @@ classDiagram
         +str recurrence
         +mark_complete() None
         +priority_value() int
-        +next_occurrence() Task
+        +next_occurrence() Optional~Task~
         +identity() tuple
     }
 
@@ -43,13 +45,18 @@ classDiagram
         +list~Task~ scheduled_tasks
         +list~Task~ skipped_tasks
         +date plan_date
+        -dict _reasons
         +collect_tasks() list~Task~
         +sort_tasks(tasks: list~Task~) list~Task~
+        +sort_by_time(tasks: list~Task~) list~Task~
+        +filter_tasks(pet_name: str, completed: bool) list~Task~
         +build_daily_plan() list~Task~
         +total_scheduled_minutes() int
         +explain_plan() str
         +detect_conflicts() list~str~
-        +complete_task(pet: Pet, task: Task) Task
+        +complete_task(pet: Pet, task: Task) Optional~Task~
+        -_is_preferred(task: Task) bool
+        -_schedule_reason(task: Task) str
     }
 
     Owner "1" o-- "0..*" Pet : owns
