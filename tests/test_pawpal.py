@@ -271,3 +271,99 @@ def test_filter_tasks_without_filters_returns_all_tasks():
     scheduler = make_scheduler_with_mixed_tasks()
 
     assert len(scheduler.filter_tasks()) == 5
+
+
+def test_daily_plan_stays_within_available_minutes_and_prefers_high_priority():
+    """build_daily_plan() should never use more than the owner's minutes, and should keep high-priority tasks over low ones."""
+    scheduler, mochi = make_scheduler_with_pet()
+    scheduler.owner.available_minutes = 60
+    mochi.add_task(Task("Bath", 40, priority="low"))  # added first so ignoring priority would schedule it
+    mochi.add_task(Task("Morning walk", 30, priority="high"))
+    mochi.add_task(Task("Meds", 10, priority="high"))
+    mochi.add_task(Task("Dinner", 15, priority="medium"))
+
+    plan = scheduler.build_daily_plan()
+
+    assert scheduler.total_scheduled_minutes() <= 60
+    assert {t.title for t in plan} == {"Morning walk", "Meds", "Dinner"}
+    assert [t.title for t in scheduler.skipped_tasks] == ["Bath"]
+
+
+def test_daily_plan_skips_task_that_does_not_fit_but_keeps_filling_time():
+    """A task too long for the remaining time should be skipped while smaller tasks after it are still scheduled."""
+    scheduler, mochi = make_scheduler_with_pet()
+    scheduler.owner.available_minutes = 40
+    mochi.add_task(Task("Park visit", 30, priority="high"))
+    mochi.add_task(Task("Hike", 35, priority="high"))  # only 10 min left after the park visit
+    mochi.add_task(Task("Brush teeth", 5, priority="low"))
+
+    plan = scheduler.build_daily_plan()
+
+    assert {t.title for t in plan} == {"Park visit", "Brush teeth"}
+    assert [t.title for t in scheduler.skipped_tasks] == ["Hike"]
+    assert scheduler.total_scheduled_minutes() == 35
+
+
+def test_daily_plan_schedules_tasks_that_exactly_fill_available_time():
+    """Tasks whose durations add up to exactly the available minutes should all be scheduled."""
+    scheduler, mochi = make_scheduler_with_pet()
+    scheduler.owner.available_minutes = 30
+    mochi.add_task(Task("Morning walk", 20))
+    mochi.add_task(Task("Breakfast", 10))
+
+    plan = scheduler.build_daily_plan()
+
+    assert len(plan) == 2
+    assert scheduler.skipped_tasks == []
+    assert scheduler.total_scheduled_minutes() == 30
+
+
+def test_daily_plan_is_empty_when_owner_has_zero_minutes():
+    """An owner with no available time should get an empty plan, with every task skipped."""
+    scheduler, mochi = make_scheduler_with_pet()
+    scheduler.owner.available_minutes = 0
+    mochi.add_task(Task("Breakfast", 10, priority="high"))
+
+    assert scheduler.build_daily_plan() == []
+    assert [t.title for t in scheduler.skipped_tasks] == ["Breakfast"]
+
+
+def test_daily_plan_is_empty_for_owner_without_pets_or_tasks():
+    """An owner with no pets, or a pet with no tasks, should get an empty plan without errors."""
+    no_pets = Scheduler(Owner("Jordan", available_minutes=90))
+    no_tasks, _ = make_scheduler_with_pet()
+
+    for scheduler in (no_pets, no_tasks):
+        assert scheduler.build_daily_plan() == []
+        assert scheduler.skipped_tasks == []
+        assert scheduler.detect_conflicts() == []
+        assert scheduler.sort_by_time([]) == []
+        assert "No tasks scheduled." in scheduler.explain_plan()
+
+
+def test_daily_plan_includes_overdue_but_not_completed_or_future_tasks():
+    """Today's plan should include overdue tasks and leave out completed tasks and tasks due later."""
+    scheduler, mochi = make_scheduler_with_pet()
+    today = date.today()
+    done = Task("Already fed", 10)
+    done.mark_complete()
+    mochi.add_task(done)
+    mochi.add_task(Task("Vet visit", 30, due_date=today + timedelta(days=1)))
+    mochi.add_task(Task("Nail trim", 15, due_date=today - timedelta(days=2)))
+
+    plan = scheduler.build_daily_plan()
+
+    assert [t.title for t in plan] == ["Nail trim"]
+
+
+def test_daily_plan_is_chronological_even_when_chosen_by_priority():
+    """build_daily_plan() picks tasks by priority but should list the chosen tasks in time order."""
+    scheduler, mochi = make_scheduler_with_pet()
+    mochi.add_task(Task("Dinner", 10, priority="high", time="18:00"))
+    mochi.add_task(Task("Play", 15, priority="low"))  # no time
+    mochi.add_task(Task("Breakfast", 10, priority="low", time="07:00"))
+    mochi.add_task(Task("Morning walk", 30, priority="medium", time="08:30"))
+
+    plan = scheduler.build_daily_plan()
+
+    assert [t.title for t in plan] == ["Breakfast", "Morning walk", "Dinner", "Play"]

@@ -104,33 +104,68 @@ Completed Mochi's 'Nail trim' (weekly, due 2026-10-29)
   -> next 'Nail trim' due 2026-11-05 at 16:00, completed=False
 ```
 
-## 🧪 Testing PawPal+
+## Testing PawPal+
+
+### Running the tests
+
+On macOS, run the full test suite from the project folder with:
 
 ```bash
-# Run the full test suite:
+python3 -m pytest
+```
+
+The assignment instructions use `python -m pytest`, which runs the same tests. On many Macs, `python` is not available or points to an older version, so `python3` is the safer choice.
+
+Other useful options:
+
+```bash
+# Shorter output (one dot per test):
 python3 -m pytest -q
 
-# Run with coverage:
+# Run with coverage (requires: pip install pytest-cov):
 python3 -m pytest --cov=pawpal_system
 ```
 
-Coverage requires the `pytest-cov` package (`pip install pytest-cov`).
+### Test results
 
-Sample test output:
+Output from the latest run (the `rootdir` path is shortened to the project folder name for display):
 
 ```text
-..............................                                           [100%]
-30 passed in 0.11s
+============================= test session starts ==============================
+platform darwin -- Python 3.12.7, pytest-7.4.4, pluggy-1.0.0
+rootdir: ai110-module2show-pawpal-starter
+plugins: anyio-4.2.0
+collected 37 items
+
+tests/test_pawpal.py .....................................               [100%]
+
+============================== 37 passed in 0.08s ==============================
 ```
 
-The 30 tests in `tests/test_pawpal.py` cover:
+### What the tests cover
 
-- **Basic tasks:** marking a task complete and adding a task to a pet.
+The 37 tests in `tests/test_pawpal.py` cover:
+
+- **Task creation and completion:** marking a task complete and adding a task to a pet.
 - **Sorting:** out-of-order times (including `"8:05"` vs `"20:00"`), untimed tasks going last, and leaving the original list unchanged.
 - **Filtering:** case-insensitive pet names, completed and pending tasks, both filters combined, an unknown pet name, and no filters.
 - **Recurring tasks:** daily and weekly next occurrences, non-recurring tasks, keeping task details, avoiding duplicates, and overdue tasks.
 - **Conflict detection:** exact-time conflicts, overlapping durations for the same pet and for different pets, and cases that should not be flagged (different dates, back-to-back tasks, and tasks without a time).
 - **Time validation:** valid times, an empty time, and invalid times.
+- **Daily plan (`build_daily_plan()`):**
+  - Scheduling priorities: high-priority tasks are kept over low-priority ones.
+  - Available-minute limits: the plan never goes over the owner's time, a task that does not fit is skipped while smaller tasks still get scheduled, tasks that exactly fill the time are all scheduled, and an owner with zero minutes gets an empty plan.
+  - Empty task lists: an owner with no pets, or a pet with no tasks, gets an empty plan without errors.
+  - Task selection: overdue tasks are included, and completed and future tasks are left out.
+  - Order: the chosen tasks are listed in time order.
+
+To check that the daily-plan tests are meaningful, each one was also run against deliberately broken versions of the scheduler (for example, one that ignores priority or the time limit), patched in memory only. Every broken version made at least one test fail.
+
+### Confidence Level
+
+**★★★★☆ (4/5 stars)**
+
+The backend in `pawpal_system.py` is well tested: every scheduling feature has its own automated tests, including edge cases, and all 37 pass. I am not giving it 5 stars because the Streamlit interface (`app.py`) is not yet connected to the scheduling features. It cannot build a plan, sort, filter, complete recurring tasks, or show conflict warnings yet, and it has no automated tests. That part still needs full integration and testing.
 
 ## 📐 Smarter Scheduling
 
