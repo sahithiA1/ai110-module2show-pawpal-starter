@@ -1,5 +1,7 @@
 import streamlit as st
 
+from pawpal_system import Owner, Pet, Task
+
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 
 st.title("🐾 PawPal+")
@@ -42,12 +44,36 @@ st.subheader("Quick Demo Inputs (UI only)")
 owner_name = st.text_input("Owner name", value="Jordan")
 pet_name = st.text_input("Pet name", value="Mochi")
 species = st.selectbox("Species", ["dog", "cat", "other"])
+age = st.number_input("Age (years)", min_value=0, max_value=40, value=3)
+
+# Create the Owner only once so its pets and tasks survive Streamlit reruns
+if "owner" not in st.session_state:
+    st.session_state.owner = Owner(owner_name, available_minutes=90)
+owner = st.session_state.owner
+owner.name = owner_name  # keep the stored owner in sync with the name input
+
+if st.button("Add pet"):
+    try:
+        owner.add_pet(Pet(pet_name, species=species, age=int(age)))
+        st.success(f"Added {pet_name} the {species}.")
+    except ValueError as error:  # add_pet rejects a duplicate pet name
+        st.warning(str(error))
+
+if owner.pets:
+    st.write("Current pets:")
+    st.table(
+        [
+            {"name": p.name, "species": p.species, "age": p.age, "tasks": len(p.tasks)}
+            for p in owner.pets
+        ]
+    )
+else:
+    st.info("No pets yet. Add one above.")
 
 st.markdown("### Tasks")
 st.caption("Add a few tasks. In your final version, these should feed into your scheduler.")
 
-if "tasks" not in st.session_state:
-    st.session_state.tasks = []
+task_pet_name = st.selectbox("Pet for this task", [p.name for p in owner.pets])
 
 col1, col2, col3 = st.columns(3)
 with col1:
@@ -58,13 +84,29 @@ with col3:
     priority = st.selectbox("Priority", ["low", "medium", "high"], index=2)
 
 if st.button("Add task"):
-    st.session_state.tasks.append(
-        {"title": task_title, "duration_minutes": int(duration), "priority": priority}
-    )
+    task_pet = next((p for p in owner.pets if p.name == task_pet_name), None)
+    if task_pet is None:
+        st.warning("Add a pet before adding tasks.")
+    else:
+        task_count = len(task_pet.tasks)
+        task_pet.add_task(Task(task_title, int(duration), priority=priority))
+        if len(task_pet.tasks) == task_count:  # add_task ignores duplicates
+            st.warning(f"{task_pet.name} already has '{task_title}' today.")
 
-if st.session_state.tasks:
+all_tasks = owner.get_all_tasks()
+if all_tasks:
     st.write("Current tasks:")
-    st.table(st.session_state.tasks)
+    st.table(
+        [
+            {
+                "pet": t.pet_name,
+                "title": t.title,
+                "duration_minutes": t.duration_minutes,
+                "priority": t.priority,
+            }
+            for t in all_tasks
+        ]
+    )
 else:
     st.info("No tasks yet. Add one above.")
 
