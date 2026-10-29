@@ -1,5 +1,6 @@
 """Basic tests for the PawPal+ Task, Pet, and Scheduler classes."""
 
+from dataclasses import replace
 from datetime import date, timedelta
 
 import pytest
@@ -120,6 +121,27 @@ def make_scheduler_with_two_pets() -> tuple[Scheduler, Pet, Pet]:
     scheduler.owner.add_pet(luna)
     return scheduler, mochi, luna
 
+
+def test_completing_a_copied_task_raises_and_changes_nothing():
+    """complete_task() should reject a copy with identical fields and only accept the pet's actual task."""
+    scheduler, pet = make_scheduler_with_pet()
+    task = Task("Breakfast", 10, time="07:30", recurrence="daily")
+    pet.add_task(task)
+    copy = replace(task)  # equal field values, but a different object
+    assert copy == task and copy is not task
+
+    with pytest.raises(ValueError):
+        scheduler.complete_task(pet, copy)
+
+    assert task.completed is False
+    assert copy.completed is False
+    assert pet.tasks == [task]  # no recurring occurrence was created
+
+    next_task = scheduler.complete_task(pet, task)  # the real task still works
+
+    assert task.completed is True
+    assert next_task.due_date == date.today() + timedelta(days=1)
+    assert len(pet.tasks) == 2
 
 def test_tasks_at_same_time_conflict():
     """Two tasks starting at the same time on the same date should produce one warning."""

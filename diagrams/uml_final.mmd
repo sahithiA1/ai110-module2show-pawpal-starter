@@ -1,0 +1,65 @@
+classDiagram
+    %% PawPal+ final class diagram. Matches the completed classes in pawpal_system.py.
+    %% Public members only; private helpers (_is_preferred, _schedule_reason, _reasons) are left out for readability.
+    %% Task checks in __post_init__ that time is empty or a valid 24-hour "HH:MM" string.
+    %% Module helper (not a class): time_to_minutes(hhmm) is used by sort_by_time() and detect_conflicts().
+
+    class Owner {
+        +str name
+        +int available_minutes
+        +list~str~ preferences
+        +list~Pet~ pets
+        +add_pet(pet: Pet) None
+        +remove_pet(pet_name: str) None
+        +get_all_tasks() list~Task~
+    }
+
+    class Pet {
+        +str name
+        +str species
+        +int age
+        +list~Task~ tasks
+        +add_task(task: Task) None
+        +remove_task(title: str) None
+        +get_pending_tasks() list~Task~
+    }
+
+    class Task {
+        +str title
+        +int duration_minutes
+        +str priority
+        +str category
+        +str preferred_time
+        +str time
+        +date due_date
+        +str pet_name
+        +bool completed
+        +str recurrence
+        +mark_complete() None
+        +priority_value() int
+        +next_occurrence() Optional~Task~
+        +identity() tuple
+    }
+
+    class Scheduler {
+        +Owner owner
+        +date plan_date
+        +list~Task~ scheduled_tasks
+        +list~Task~ skipped_tasks
+        +collect_tasks() list~Task~
+        +sort_tasks(tasks: list~Task~) list~Task~
+        +build_daily_plan() list~Task~
+        +total_scheduled_minutes() int
+        +explain_plan() str
+        +sort_by_time(tasks: list~Task~) list~Task~
+        +filter_tasks(pet_name: Optional~str~, completed: Optional~bool~) list~Task~
+        +detect_conflicts() list~str~
+        +complete_task(pet: Pet, task: Task) Optional~Task~
+    }
+
+    Owner "1" o-- "0..*" Pet : owns
+    Pet "1" *-- "0..*" Task : needs
+    Scheduler "1" --> "1" Owner : plans for
+    Scheduler "1" --> "0..*" Task : schedules
+    Scheduler ..> Pet : completes tasks for
+    Task ..> Task : next_occurrence creates

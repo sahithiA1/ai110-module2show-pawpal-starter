@@ -297,7 +297,8 @@ class Scheduler:
 
     def complete_task(self, pet: Pet, task: Task) -> Optional[Task]:
         """Mark a pet's task complete and add its next occurrence to the pet, if it recurs."""
-        if task not in pet.tasks:
+        # Require the pet's actual Task object; `in` would also accept a copy with equal fields
+        if not any(existing is task for existing in pet.tasks):
             raise ValueError(f"'{task.title}' is not one of {pet.name}'s tasks.")
         task.mark_complete()
         if task in self.scheduled_tasks:
